@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>银龄智办 · 项目片</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e1418; overflow: hidden; }
+  canvas { display: block; }
+  #err {
+    position: fixed; inset: 0; padding: 40px; color: #fff; background: #0e1418;
+    font: 16px/1.6 monospace; white-space: pre-wrap; z-index: 99;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./node_modules/three/build/three.module.js",
+    "three/addons/": "./node_modules/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="err" hidden></div>
+<script type="module">
+import * as THREE from 'three'
+import { Stage } from './src/stage.js'
+import { SHOTS, DURATION, FPS, WIDTH, HEIGHT, FILM, cueSheet } from './src/pitch/timeline.js'
+
+// Any thrown error must reach the renderer, otherwise a broken shader produces
+// thousands of identical black frames and looks like a very slow render.
+const errBox = document.getElementById('err')
+function fail(e) {
+  window.__error = String(e?.stack || e)
+  errBox.hidden = false
+  errBox.textContent = window.__error
+  console.error(e)
+}
+window.addEventListener('error', ev => fail(ev.error || ev.message))
+window.addEventListener('unhandledrejection', ev => fail(ev.reason))
+
+try {
+  // 项目片的颗粒参数，必须在 new Stage() 之前设好（Stage 从 location.search 读）。
+  // 全幅度颗粒在深色背景上是"一闪一闪"的小点：这一版的多数镜头是静置构图 + 大片深底，
+  // 唯一在动的就剩颗粒，所以把深阴影里的颗粒收住、总量也略降。
+  // 用 URL 默认值的方式设，正片 index.html 保持逐像素不变。
+  {
+    const q = new URLSearchParams(location.search)
+    if (!q.has('grain')) {
+      q.set('grain', '0.009')
+      q.set('shadowGrain', '0.28')
+      history.replaceState(null, '', location.pathname + '?' + q.toString())
+    }
+  }
+
+  const stage = new Stage({ width: WIDTH, height: HEIGHT })
+  for (const shot of SHOTS) stage.add(shot)
+  // 表现层（章标 / 中英字幕 / 片头片尾黑边 / HITS）从 FILM 这一份数据里长出来
+  stage.setFilm(FILM)
+  window.__stage = stage
+  window.__THREE = THREE
+
+  window.__renderAt = (t, opts) => {
+    try {
+      const clamped = Math.max(0, Math.min(DURATION - 1e-6, t))
+      stage.renderAt(clamped, opts)
+    } catch (e) { fail(e) }
+  }
+
+  window.__cues = () => cueSheet()
+  window.__duration = DURATION
+  window.__film = {
+    title: '银龄智办 — 项目片（开头 / 我们是什么 / 我们能干什么 / 为什么选择我们）',
+    duration: DURATION,
+    fps: FPS,
+    width: WIDTH,
+    height: HEIGHT,
+    shots: SHOTS.map(s => ({ name: s.name, start: s.start, duration: s.duration, labels: s.labels })),
+  }
+  window.__ready = true
+} catch (e) {
+  fail(e)
+}
+</script>
+</body>
+</html>

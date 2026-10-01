@@ -251,6 +251,53 @@ export const shotSpiral = defineShot({
     )
     title.scale.set(3.4, 3.4, 1)
     title.position.set(0, 0.16, 1.2)
+
+    // 片名要落在画面正中：相机看的是 (0, GROUP_Y, 0)，而片名在 z=1.2 的深度上，
+    // 所以它在视线的下方偏左。取片名节拍时的那条视线，与 z=1.2 的平面求交，
+    // 交点就是画面中心；整块（片名 + 英文副题）按这个差值平移，大小与间距都不动。
+    const tBeat = 11.8
+    const kT = easeInOut(tBeat / 15)
+    const halfHT = (HEIGHT * GROUP_SCALE / 2 + 1.0) / Math.tan(THREE.MathUtils.degToRad(stage.camera.fov / 2))
+    const distT = halfHT * 1.05 - 0.9 * kT
+    const swingT = -0.42 + 0.22 * kT
+    const camT = new THREE.Vector3(
+      Math.sin(swingT) * distT,
+      GROUP_Y + 0.30 + 0.20 * Math.sin(tBeat * 0.22),
+      Math.cos(swingT) * distT,
+    )
+    const uT = 1 - title.position.z / camT.z
+    const centre = camT.clone().lerp(new THREE.Vector3(0, GROUP_Y, 0), uT)
+    const shift = centre.sub(title.position)
+    title.position.add(shift)
+
+    // 极淡的暗底：片名压在螺旋的亮部上时，白字会糊。它不是卡片，只是一层径向渐变，
+    // 和字幕底下那道渐变是同一个做法。
+    const backCanvas = document.createElement('canvas')
+    backCanvas.width = 512
+    backCanvas.height = 256
+    {
+      const bc = backCanvas.getContext('2d')
+      // 椭圆渐变：直接画圆形渐变会被矩形裁出四条边，按画幅比例压扁就没有边了
+      bc.translate(256, 128)
+      bc.scale(2, 1)
+      const grd = bc.createRadialGradient(0, 0, 0, 0, 0, 128)
+      grd.addColorStop(0, 'rgba(5,9,11,0.94)')
+      grd.addColorStop(0.42, 'rgba(5,9,11,0.72)')
+      grd.addColorStop(0.72, 'rgba(5,9,11,0.30)')
+      grd.addColorStop(1, 'rgba(5,9,11,0)')
+      bc.fillStyle = grd
+      bc.fillRect(-256, -128, 512, 256)
+    }
+    const backTex = new THREE.CanvasTexture(backCanvas)
+    backTex.colorSpace = THREE.SRGBColorSpace
+    const backdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.1, 2.3),
+      new THREE.MeshBasicMaterial({ map: backTex, transparent: true, depthWrite: false, opacity: 0 })
+    )
+    backdrop.position.set(title.position.x, title.position.y - 0.12, title.position.z - 0.06)
+    stage.scene.add(backdrop)
+    g.userData.backdrop = backdrop
+
     stage.scene.add(title)
     g.userData.title = title
 
@@ -287,6 +334,7 @@ export const shotSpiral = defineShot({
     )
     sub.scale.set(1.55, 1.55, 1)
     sub.position.set(0, -0.52, 1.2)
+    sub.position.add(shift)   // 跟着片名一起挪到画面正中
     stage.scene.add(sub)
     g.userData.sub = sub
 
@@ -294,7 +342,15 @@ export const shotSpiral = defineShot({
   },
 
   enter(stage) {
-    stage.spiralGroup.visible = true
+    const g = stage.spiralGroup
+    g.visible = true
+    // 片名、英文副题、暗底与火花都直接挂在 scene 上（不挂进螺旋组，见 build 里的注释），
+    // 而 cutTo() 会先把 scene 的每个子对象藏起来——所以这里必须自己把它们放出来，
+    // 否则片名那一拍永远不会出现（这个 bug 在原片里也一直存在）。
+    for (const key of ['title', 'sub', 'backdrop', 'sparks']) {
+      const o = g.userData[key]
+      if (o) o.visible = true
+    }
   },
 
   update(stage, local, t) {
@@ -336,6 +392,9 @@ export const shotSpiral = defineShot({
     const planeGone = smooth01(local, B.dissolveStart, B.dissolveDur * 0.55)
     g.userData.title.material.opacity = smooth01(local, B.titleIn, B.titleInDur) * (1 - planeGone)
     g.userData.sub.material.opacity = smooth01(local, B.subIn, B.subInDur) * (1 - planeGone)
+    if (g.userData.backdrop) {
+      g.userData.backdrop.material.opacity = smooth01(local, B.titleIn - 0.2, B.titleInDur) * (1 - planeGone) * 0.9
+    }
     if (g.userData.sparkMat) {
       const u = g.userData.sparkMat.uniforms
       u.uMorph.value = dissolve
@@ -370,7 +429,13 @@ export const shotSpiral = defineShot({
   },
 
   teardown(stage) {
-    stage.spiralGroup.visible = false
+    const g = stage.spiralGroup
+    g.visible = false
+    // 它们不在螺旋组里，必须自己收——否则片名会一直留在后面的镜头上
+    for (const key of ['title', 'sub', 'backdrop', 'sparks']) {
+      const o = g.userData[key]
+      if (o) o.visible = false
+    }
   },
 
   labels: ['开机 · 螺旋成形'],

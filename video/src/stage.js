@@ -71,6 +71,9 @@ export class Stage {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(width, height), bloomStrength, 0.62, 0.86)
     this.composer.addPass(this.bloom)
     this.lens = new ShaderPass(LENS_SHADER)
+    // 颗粒也可以从 URL 调（?grain=0.009&shadowGrain=0.28），默认值与原来完全一致。
+    this.lens.uniforms.uGrain.value = Number(params.get('grain') ?? 0.016)
+    this.lens.uniforms.uShadowGrain.value = Number(params.get('shadowGrain') ?? 1.0)
     this.composer.addPass(this.lens)   // last pass: tone maps and encodes to sRGB itself
 
     // ---- the backdrop ---------------------------------------------------------------
@@ -413,6 +416,9 @@ const LENS_SHADER = {
     uTime: { value: 0 },
     uVignette: { value: 0.62 },
     uGrain: { value: 0.016 },
+    // 1.0 = 颗粒在全亮度范围内等幅（原来就是这样）。调小它，深阴影里的颗粒会先被收住，
+    // 中间调保留质感——静置构图 + 大片深底时，等幅颗粒会变成"一闪一闪的小点"。
+    uShadowGrain: { value: 1.0 },
     uAberration: { value: 0.0022 },
   },
   vertexShader: /* glsl */`
@@ -424,7 +430,7 @@ const LENS_SHADER = {
   `,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
-    uniform float uTime, uVignette, uGrain, uAberration;
+    uniform float uTime, uVignette, uGrain, uAberration, uShadowGrain;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -462,7 +468,10 @@ const LENS_SHADER = {
       col *= 1.0 - uVignette * smoothstep(0.10, 0.80, r2);
 
       float g = hash(vUv * vec2(1920.0, 1080.0) + uTime * 60.0) - 0.5;
-      col += g * uGrain;
+      // 颗粒按亮度加权：深阴影里收住，中间调保留质感。uShadowGrain = 1.0 时
+      // mix(1,1,·) = 1，与原来逐像素一致——原片一点不受影响。
+      float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col += g * uGrain * mix(uShadowGrain, 1.0, smoothstep(0.02, 0.18, lum));
 
       // ---- highlight roll-off only ------------------------------------------------
       //
