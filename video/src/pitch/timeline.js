@@ -1,10 +1,10 @@
 // 项目片的唯一时间源。
 //
-// 结构（4:00 = 240.0s）：
-//   开头            0:00–0:24   24s   2 镜
-//   Ⅰ 我们是什么    0:24–1:40   76s   5 镜
-//   Ⅱ 我们能干什么  1:40–3:04   84s   5 镜
-//   Ⅲ 为什么选择我们 3:04–4:00  56s   4 镜
+// 结构（4:00 = 240.0s，15 镜）：
+//   开头            0:00–0:15   15s   1 镜（序 · 开机）
+//   Ⅰ 我们是什么    0:15–1:34   79s   5 镜
+//   Ⅱ 我们能干什么  1:34–3:03   89s   5 镜
+//   Ⅲ 为什么选择我们 3:03–4:00  57s   4 镜
 //
 // 与正片一样：画面与字幕都是 t 的纯函数，镜头声明自己的章标、字幕、音效与运动模糊预算，
 // 表现层从这一份数据里取字幕和章标——所以文档、画面、cue 表不可能各说各话。
@@ -14,7 +14,6 @@ export const WIDTH = 1920
 export const HEIGHT = 1080
 
 import { shotSpiral } from '../shots/01-spiral.js'
-import { shotAnotherWay } from './shots/p02-another-way.js'
 import { shotWhatWeAre } from './shots/p03-what-we-are.js'
 import { shotListening } from './shots/p04-listening.js'
 import { shotSeeing } from './shots/p05-seeing.js'
@@ -30,49 +29,54 @@ import { shotEvidence } from './shots/p14-evidence.js'
 import { shotBoundary } from './shots/p15-boundary.js'
 import { shotClose } from './shots/p16-close.js'
 
-// 开头用回正片原来的「序 · 开机」，**放满它自己的 15 秒**：这一镜的节拍表是
-// 片名 10.1s 落定、12.3s 开始化开、15.0s 火花并回螺旋。13s 就切会把化开那一拍砍断，
-// 看上去像卡了一下。所以给它完整 15 秒，第二镜相应压到 9 秒（它 7.7 秒就演完了），
-// 后面 14 个镜头不动，总长仍是 4:00。
-//
-// 字幕改过：镜头自己已经有一块居中的大字片名 + 中文副题，字幕再写一遍"银龄智办"
-// 就是同一句话说两次，所以这里只留英文副题。
+// 开头：正片原来的「序 · 开机」，放满它自己的 15 秒（片名 10.1s 落定、12.3s 开始化开、
+// 15.0s 火花并回螺旋）。字幕只留英文副题——镜头自己已有一块居中的大字片名 + 中文副题，
+// 字幕再写一遍"银龄智办"就是同一句话出现两次。
 const shotOpening = {
   ...shotSpiral,
   subs: [[10.9, 14.2, '', 'A trustworthy cross-app assistant for older people.']],
 }
 
-// 第二镜：让出 2 秒给序章。粒子/卡片/网格/编号/片名分别在第 2.5、2.7、4.4、5.5、7.7 秒收尾，
-// 9 秒足够；第三条字幕本来就是把画面上的片名再念一遍，直接去掉。
-const shotBridge = {
-  ...shotAnotherWay,
-  start: 15,
-  duration: 9,
-  subs: [
-    [0.8, 4.2, '屏幕上的像素，是另一条路', 'The pixels are another way in.'],
-    [4.6, 7.6, '截图加比例坐标，照样点得准', 'A screenshot and proportion coordinates aim just as well.'],
-  ],
-  sfx: [[0.5, 'whoosh', { dur: 1.2 }], [3.2, 'sparkle'], [4.6, 'tick'], [6.2, 'chime', { midi: 76 }]],
-}
-
-export const SHOTS = [
-  shotOpening,     // 开头     0:00–0:15   （正片原镜头，完整 15s）
-  shotBridge,      // 开头     0:15–0:24
-  shotWhatWeAre,   // Ⅰ        0:24–0:39
-  shotListening,   // Ⅰ        0:39–0:55
-  shotSeeing,      // Ⅰ        0:55–1:11
-  shotLoop,        // Ⅰ        1:11–1:26
-  shotMeasure,     // Ⅰ        1:26–1:40
-  shotTasks,       // Ⅱ        1:40–1:56
-  shotNotInTree,   // Ⅱ        1:56–2:15
-  shotDangerous,   // Ⅱ        2:15–2:34
-  shotHandBack,    // Ⅱ        2:34–2:51
-  shotHearing,     // Ⅱ        2:51–3:04
-  shotNoHardware,  // Ⅲ        3:04–3:17
-  shotEvidence,    // Ⅲ        3:17–3:38
-  shotBoundary,    // Ⅲ        3:38–3:51
-  shotClose,       // Ⅲ        3:51–4:00
+// 各镜时长。原来 0:15–0:24 有一镜过场（另一条路：粒子聚成截图 + 编号网格），已删；
+// 少掉的 9 秒按信息量分摊给九镜，每镜结尾多留一拍，总长仍是 4:00。
+//
+// 时长只决定镜头结尾停留多久——镜头内部的节拍、字幕、音效都是相对时间，不会被打乱；
+// probe-cuts 会逐个切点检查"动画是否已经放完"，所以加长之后也不会把动画切在中间。
+const DURATIONS = [
+  15,  // 序 · 开机           0:00–0:15
+  16,  // Ⅰ 我们是什么        0:15–0:31
+  17,  // Ⅰ 听得进去          0:31–0:48
+  17,  // Ⅰ 看得见页面        0:48–1:05
+  15,  // Ⅰ 办事循环          1:05–1:20
+  14,  // Ⅰ 分寸与交还        1:20–1:34
+  17,  // Ⅱ 十三件事          1:34–1:51
+  20,  // Ⅱ 树里没有的        1:51–2:11
+  20,  // Ⅱ 危险的一步        2:11–2:31
+  18,  // Ⅱ 省的是手脚        2:31–2:49
+  14,  // Ⅱ 听得准            2:49–3:03
+  13,  // Ⅲ 不换设备          3:03–3:16
+  22,  // Ⅲ 不说没做到的      3:16–3:38
+  13,  // Ⅲ 不越界            3:38–3:51
+   9,  // Ⅲ 收束              3:51–4:00
 ]
+
+const CUT = [
+  shotOpening, shotWhatWeAre, shotListening, shotSeeing, shotLoop, shotMeasure,
+  shotTasks, shotNotInTree, shotDangerous, shotHandBack, shotHearing,
+  shotNoHardware, shotEvidence, shotBoundary, shotClose,
+]
+
+// 时间轴在一处铺开：每镜的 start 由前面各镜的时长累加而来。
+// 增删镜头只需要改 DURATIONS，不必去动十几个镜头文件里的 start。
+// （p01-unseen「空树」与 p02-another-way「像素成截图」两镜已不在片子里，文件保留备用。）
+export const SHOTS = (() => {
+  let t = 0
+  return CUT.map((s, i) => {
+    const o = { ...s, start: t, duration: DURATIONS[i] }
+    t += DURATIONS[i]
+    return o
+  })
+})()
 
 export const DURATION = 240.0
 
