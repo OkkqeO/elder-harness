@@ -60,11 +60,8 @@ export const shotNotInTree = defineShot({
       tree.add(ghost)
       nodes.push({ left, ghost, y })
     }
-    const ghostNote = makeLabel('课程名：树里没有', { px: 26, weight: 500, color: '#E2705F', layer: LAYER_UI })
-    ghostNote.position.set(0.44, -0.74, 0.02)
-    ghostNote.material.opacity = 0
-    tree.add(ghostNote)
-
+    // 树只给出节次，课程名那一列是空的。空位本身 + 顶部的数据条（课程名节点 0）
+    // 已经把这件事说清了，不再另加一行"课程名：树里没有"的文字标注。
     const treeStrip = makeDataStrip([['节次节点', '6'], ['课程名节点', '0', '#E2705F']], { width: 1.30, height: 0.26 })
     treeStrip.position.set(0.10, 0.76, 0.32)
     treeStrip.material.opacity = 0
@@ -106,15 +103,7 @@ export const shotNotInTree = defineShot({
       ticks.push(t)
     }
 
-    const verdict = makePill('结论：与截图逐项核对一致　3 步 · 7s', {
-      width: 2.10, height: 0.17, size: 32, color: '#CFE8DF',
-      fill: 'rgba(14,26,22,0.92)', stroke: 'rgba(80,190,150,0.85)',
-    })
-    verdict.position.set(0.10, -0.90, 0.34)
-    verdict.material.opacity = 0
-    group.add(verdict)
-
-    group.userData = { phone, nodes, ghostNote, treeStrip, shotCard, ticks, verdict }
+    group.userData = { phone, nodes, treeStrip, shotCard, ticks }
     stage.userData.pitchNotInTree = group
   },
 
@@ -162,7 +151,6 @@ export const shotNotInTree = defineShot({
       u.nodes[i].left.material.opacity = a * 0.60
       u.nodes[i].ghost.material.opacity = ramp(local, 6.0 + i * 0.14, 0.8, EASE.out) * 0.34
     }
-    u.ghostNote.material.opacity = ramp(local, 6.4, 1.0, EASE.out) * 0.95
     u.treeStrip.material.opacity = ramp(local, 5.6, 0.9, EASE.out) * 0.95
 
     // 截图卡 + 逐项核对
@@ -174,7 +162,6 @@ export const shotNotInTree = defineShot({
       u.ticks[i].material.opacity = a * 0.98
       u.ticks[i].position.x = u.shotCard.position.x
     }
-    u.verdict.material.opacity = ramp(local, 15.2, 0.9, EASE.out) * 0.96
   },
 
   teardown(stage) {
